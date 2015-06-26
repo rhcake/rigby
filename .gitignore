@@ -1,0 +1,9 @@
+
+#directories
+bin
+out
+
+#demo object files
+demo/**/*.exe
+demo/**/*.dll
+

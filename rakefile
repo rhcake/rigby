@@ -1,0 +1,132 @@
+require "rake/clean"
+
+directory "bin"
+directory "out"
+directory "out/api"
+directory "demo"
+
+EXE = "bin/rigby.exe"
+
+SWIGMOD = "RigbyBridge";
+SWIGI = "RigbyBridge.i";
+APIH = FileList["inc/api/**/*.h"];
+APICS = APIH.map do |f| 
+	f.ext("cs").gsub(/^inc\/api\//, "env/Rigby/");
+end
+
+File.open(SWIGI, "w") do |f|
+	f.puts("%module #{SWIGMOD}");
+	f.puts("");
+	f.puts("%{");
+	APIH.each { |h|
+		f.puts("#include <#{h.gsub(/^inc\//, "")}>");
+	};
+	f.puts("%}");
+	f.puts("");
+	f.puts("%include <C:/swig/Lib/windows.i>");
+	f.puts("");
+	APIH.each { |h|
+		f.puts("%include \"#{h}\"");
+	};
+end
+
+CSRC = FileList["src/**/*.cpp", "src/**/*.c"];
+COBJ = CSRC.map do |f| 
+	f.ext("obj").gsub(/^src\//, "out/");
+end
+
+CFLAGS =	"/c " 			\
+			"/I inc " 		\
+			"/I libs/lua-5.3_Win32_dll12_lib/include " 	\
+			"/I libs/SDL2-2.0.3/include " 	\
+			"/I \"C:/Program Files (x86)/Mono/include/mono-2.0\" " 	\
+			"/D _RIGBY_DEBUG_ " \
+			"/MD " 		\
+			"/EHsc " 	\
+
+rule ".obj" => ->(f) {
+	f.ext("cpp").gsub(/^out\//, "src/");
+} do |f|
+	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
+end
+
+rule ".obj" => ->(f) {
+	f.ext("c").gsub(/^out\//, "src/");
+} do |f|
+	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
+end
+
+LUA_LIB = "libs/lua-5.3_Win32_dll12_lib";
+SDL_LIB = "libs/SDL2-2.0.3/lib/x86";
+
+LDFLAGS = 	"#{LUA_LIB}/lua53.lib " 	\
+			"#{SDL_LIB}/SDL2.lib " 		\
+			"#{SDL_LIB}/SDL2main.lib " 	\
+			"#{SDL_LIB}/SDL2_ttf.lib " 	\
+			"opengl32.lib " 	\
+			"\"C:/Program Files (x86)/Mono/lib/mono-2.0.lib\" " 	\
+
+file EXE => ["out", "out/api", "demo"] + COBJ do
+
+	sh "link /SUBSYSTEM:CONSOLE #{LDFLAGS} #{COBJ.join(" ")} /OUT:#{EXE}"
+
+	FileUtils.cp("libs/lua-5.3_Win32_dll12_lib/lua53.dll", "bin/")
+
+	SDL_BIN = "libs/SDL2-2.0.3/lib/x86";
+
+	FileUtils.cp("#{SDL_BIN}/SDL2.dll"			, "bin/");	
+	FileUtils.cp("#{SDL_BIN}/SDL2_ttf.dll"		, "bin/");	
+	FileUtils.cp("#{SDL_BIN}/libfreetype-6.dll"	, "bin/");	
+	FileUtils.cp("#{SDL_BIN}/zlib1.dll"			, "bin/");
+
+	MONO_BIN = "C:/Program Files (x86)/Mono/bin";
+
+	FileUtils.cp("#{MONO_BIN}/mono-2.0.dll", "bin/");
+	
+	FileUtils.cp_r("bin/.", "demo/")
+end
+
+ENVFILES = FileList["env/**/*.lua"].map do |f| 
+	"bin/" + f;
+end
+
+rule /^bin\// => ->(f) {
+	f.sub("bin/", "")
+} do |f|
+	FileUtils.mkdir_p(File.dirname(f.name))
+	FileUtils.cp(f.source, f.name);
+end
+
+CSSRC = FileList["env/**/*.cs"];
+
+file "bin/Rigby.dll" => CSSRC do
+	sh "mcs /target:library /out:bin/Rigby.dll /recurse:env/Rigby/*.cs";
+	FileUtils.cp("bin/Rigby.dll", "demo/");
+end
+
+file "bin/Demo.dll" => CSSRC do
+	sh "mcs /reference:bin/Rigby.dll /target:library /out:bin/Demo.dll /recurse:env/Demo/*.cs";
+	FileUtils.cp("bin/Demo.dll", "demo/");
+end
+
+SWIGFLAGS = "-c++ "							\
+			"-csharp "						\
+			"-namespace Rigby "				\
+			"-o src/RigbyBridge_wrap.cpp "	\
+			"-outdir env/Rigby "			\
+			"-dllimport __Internal "					
+
+rule ".cs" => ->(f) {
+	f.ext("h").gsub(/^env\/Rigby\//, "inc/api/");
+} do |f|
+	sh "swig #{SWIGFLAGS} #{SWIGI}";
+end
+
+task :default => APICS + ["bin", "bin/Rigby.dll", "bin/Demo.dll", EXE]
+
+CLEAN.include("bin");
+CLEAN.include("out");
+
+
+
+
