@@ -1,132 +1,96 @@
 require "rake/clean"
 
-directory "bin"
-directory "out"
-directory "out/api"
-directory "demo"
 
-EXE = "bin/rigby.exe"
+SWIG_WIN = "C:/swig/Lib/windows.i";
+SWIG_MOD = "RigbyBridge";
+SWIG_I = "#{SWIG_MOD}.i";
+directory "gen/api/Rigby";
+directory "gen/src";
 
-SWIGMOD = "RigbyBridge";
-SWIGI = "RigbyBridge.i";
-APIH = FileList["inc/api/**/*.h"];
-APICS = APIH.map do |f| 
-	f.ext("cs").gsub(/^inc\/api\//, "env/Rigby/");
-end
 
-File.open(SWIGI, "w") do |f|
-	f.puts("%module #{SWIGMOD}");
+API_H = FileList["inc/api/**/*.h"];
+API_C = FileList["src/api/**/*.cpp"];
+API_CS = FileList["api/**/*.cs"];
+API_GEN = API_H.map { |f|
+	f.ext("cs").sub(/^inc\/api\//, "gen/api/");
+};
+
+
+#Generate SWIG interface file
+File.open(SWIG_I, "w") { |f|
+	f.puts("%module #{SWIG_MOD}");
 	f.puts("");
 	f.puts("%{");
-	APIH.each { |h|
-		f.puts("#include <#{h.gsub(/^inc\//, "")}>");
+	API_H.each { |h|
+		f.puts("#include <#{h.sub(/^inc\//, "")}>");
 	};
 	f.puts("%}");
 	f.puts("");
-	f.puts("%include <C:/swig/Lib/windows.i>");
+	f.puts("%include <#{SWIG_WIN}>");
 	f.puts("");
-	APIH.each { |h|
+	API_H.each { |h|
+		ns = h.sub(/^inc\/api\//, "");
+		ns = File.dirname(ns);
+		ns = ns.split("/");
+		ns.shift();
+		if (ns.length() > 0) then
+			f.print("%nspace ");
+			ns.each { |n|
+				f.print("#{n}::");
+			};
+			f.puts("#{File.basename(h, File.extname(h))};");
+			ns.each { |n|
+				f.puts("namespace #{n} {");
+			};
+		end
 		f.puts("%include \"#{h}\"");
+		if (ns.length() > 0) then
+			ns.each { |n|
+				f.puts("}");
+			};
+		end
+		f.puts("");
 	};
+}
+
+
+SWIG_FLAGS = [
+	"-c++",
+	"-csharp",
+	"-namespace Rigby",
+	"-o gen/src/RigbyBridge_wrap.cpp",
+	"-outdir gen/api/Rigby",
+	"-dllimport __Internal"].join(" ");
+
+
+rule /^gen\/api\/.+\.cs$/ => [ ->(f) {
+	f.ext("h").sub(/^gen\/api\//, "inc/api/");
+}, ->(f) {
+	f.ext("cpp").sub(/^gen\/api\//, "src/api/");
+}, "gen/api/Rigby", "gen/src"] do |f|
+	puts("#{f.source} --> #{f.name}");
+	sh "swig #{SWIG_FLAGS} #{SWIG_I}";
 end
 
-CSRC = FileList["src/**/*.cpp", "src/**/*.c"];
-COBJ = CSRC.map do |f| 
-	f.ext("obj").gsub(/^src\//, "out/");
+
+API_DLL = "bin/Rigby.dll";
+directory "bin";
+
+
+API_FLAGS = [
+	"/target:library",
+	"/out:#{API_DLL}",
+	"/recurse:api/*.cs",
+	"/recurse:gen/api/*.cs"].join(" ");
+
+
+file API_DLL => API_CS + API_GEN + ["bin"] do
+	sh "mcs #{API_FLAGS}";
 end
 
-CFLAGS =	"/c " 			\
-			"/I inc " 		\
-			"/I libs/lua-5.3_Win32_dll12_lib/include " 	\
-			"/I libs/SDL2-2.0.3/include " 	\
-			"/I \"C:/Program Files (x86)/Mono/include/mono-2.0\" " 	\
-			"/D _RIGBY_DEBUG_ " \
-			"/MD " 		\
-			"/EHsc " 	\
 
-rule ".obj" => ->(f) {
-	f.ext("cpp").gsub(/^out\//, "src/");
-} do |f|
-	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
-end
+task :default => API_DLL;
 
-rule ".obj" => ->(f) {
-	f.ext("c").gsub(/^out\//, "src/");
-} do |f|
-	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
-end
-
-LUA_LIB = "libs/lua-5.3_Win32_dll12_lib";
-SDL_LIB = "libs/SDL2-2.0.3/lib/x86";
-
-LDFLAGS = 	"#{LUA_LIB}/lua53.lib " 	\
-			"#{SDL_LIB}/SDL2.lib " 		\
-			"#{SDL_LIB}/SDL2main.lib " 	\
-			"#{SDL_LIB}/SDL2_ttf.lib " 	\
-			"opengl32.lib " 	\
-			"\"C:/Program Files (x86)/Mono/lib/mono-2.0.lib\" " 	\
-
-file EXE => ["out", "out/api", "demo"] + COBJ do
-
-	sh "link /SUBSYSTEM:CONSOLE #{LDFLAGS} #{COBJ.join(" ")} /OUT:#{EXE}"
-
-	FileUtils.cp("libs/lua-5.3_Win32_dll12_lib/lua53.dll", "bin/")
-
-	SDL_BIN = "libs/SDL2-2.0.3/lib/x86";
-
-	FileUtils.cp("#{SDL_BIN}/SDL2.dll"			, "bin/");	
-	FileUtils.cp("#{SDL_BIN}/SDL2_ttf.dll"		, "bin/");	
-	FileUtils.cp("#{SDL_BIN}/libfreetype-6.dll"	, "bin/");	
-	FileUtils.cp("#{SDL_BIN}/zlib1.dll"			, "bin/");
-
-	MONO_BIN = "C:/Program Files (x86)/Mono/bin";
-
-	FileUtils.cp("#{MONO_BIN}/mono-2.0.dll", "bin/");
-	
-	FileUtils.cp_r("bin/.", "demo/")
-end
-
-ENVFILES = FileList["env/**/*.lua"].map do |f| 
-	"bin/" + f;
-end
-
-rule /^bin\// => ->(f) {
-	f.sub("bin/", "")
-} do |f|
-	FileUtils.mkdir_p(File.dirname(f.name))
-	FileUtils.cp(f.source, f.name);
-end
-
-CSSRC = FileList["env/**/*.cs"];
-
-file "bin/Rigby.dll" => CSSRC do
-	sh "mcs /target:library /out:bin/Rigby.dll /recurse:env/Rigby/*.cs";
-	FileUtils.cp("bin/Rigby.dll", "demo/");
-end
-
-file "bin/Demo.dll" => CSSRC do
-	sh "mcs /reference:bin/Rigby.dll /target:library /out:bin/Demo.dll /recurse:env/Demo/*.cs";
-	FileUtils.cp("bin/Demo.dll", "demo/");
-end
-
-SWIGFLAGS = "-c++ "							\
-			"-csharp "						\
-			"-namespace Rigby "				\
-			"-o src/RigbyBridge_wrap.cpp "	\
-			"-outdir env/Rigby "			\
-			"-dllimport __Internal "					
-
-rule ".cs" => ->(f) {
-	f.ext("h").gsub(/^env\/Rigby\//, "inc/api/");
-} do |f|
-	sh "swig #{SWIGFLAGS} #{SWIGI}";
-end
-
-task :default => APICS + ["bin", "bin/Rigby.dll", "bin/Demo.dll", EXE]
 
 CLEAN.include("bin");
-CLEAN.include("out");
-
-
-
-
+CLEAN.include("gen");

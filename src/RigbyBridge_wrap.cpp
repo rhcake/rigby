@@ -280,12 +280,85 @@ SWIGEXPORT void SWIGSTDCALL SWIGRegisterStringCallback_RigbyBridge(SWIG_CSharpSt
 #define SWIG_contract_assert(nullreturn, expr, msg) if (!(expr)) {SWIG_CSharpSetPendingExceptionArgument(SWIG_CSharpArgumentOutOfRangeException, msg, ""); return nullreturn; } else
 
 
+#include <api/AssetLoader.h>
+#include <api/Math/Matrix.h>
+#include <api/RawAsset.h>
 #include <api/Window.h>
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+SWIGEXPORT void * SWIGSTDCALL CSharp_new_AssetLoader() {
+  void * jresult ;
+  AssetLoader *result = 0 ;
+  
+  result = (AssetLoader *)new AssetLoader();
+  jresult = (void *)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void SWIGSTDCALL CSharp_delete_AssetLoader(void * jarg1) {
+  AssetLoader *arg1 = (AssetLoader *) 0 ;
+  
+  arg1 = (AssetLoader *)jarg1; 
+  delete arg1;
+}
+
+
+SWIGEXPORT void * SWIGSTDCALL CSharp_AssetLoader_LoadAsset(void * jarg1, char * jarg2) {
+  void * jresult ;
+  AssetLoader *arg1 = (AssetLoader *) 0 ;
+  char *arg2 = (char *) 0 ;
+  RawAsset *result = 0 ;
+  
+  arg1 = (AssetLoader *)jarg1; 
+  arg2 = (char *)jarg2; 
+  result = (RawAsset *)(arg1)->LoadAsset((char const *)arg2);
+  jresult = (void *)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void * SWIGSTDCALL CSharp_new_Matrix() {
+  void * jresult ;
+  Matrix *result = 0 ;
+  
+  result = (Matrix *)new Matrix();
+  jresult = (void *)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void SWIGSTDCALL CSharp_delete_Matrix(void * jarg1) {
+  Matrix *arg1 = (Matrix *) 0 ;
+  
+  arg1 = (Matrix *)jarg1; 
+  delete arg1;
+}
+
+
+SWIGEXPORT void * SWIGSTDCALL CSharp_new_RawAsset(void * jarg1) {
+  void * jresult ;
+  aiScene *arg1 = (aiScene *) 0 ;
+  RawAsset *result = 0 ;
+  
+  arg1 = (aiScene *)jarg1; 
+  result = (RawAsset *)new RawAsset((aiScene const *)arg1);
+  jresult = (void *)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void SWIGSTDCALL CSharp_delete_RawAsset(void * jarg1) {
+  RawAsset *arg1 = (RawAsset *) 0 ;
+  
+  arg1 = (RawAsset *)jarg1; 
+  delete arg1;
+}
+
 
 SWIGEXPORT void SWIGSTDCALL CSharp_Window_SetTitle(void * jarg1, char * jarg2) {
   Window *arg1 = (Window *) 0 ;

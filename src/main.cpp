@@ -65,6 +65,7 @@ static const char *config_str(lua_State *lua, const char *name) {
 static MonoMethod *method_UpdateScripts;
 
 int main(int argc, char **argv) {
+
 	MonoDomain *domain = mono_jit_init("RigbyDomain");
 
 	MonoAssembly *assembly = 
@@ -105,7 +106,7 @@ int main(int argc, char **argv) {
 
 int mainx(int argc, char **argv) {
 
-	log("sizeof(char *): %d", sizeof(char *));
+	logln("sizeof(char *): %d", sizeof(char *));
 
 	MonoDomain *domain = domain = mono_jit_init("rigby");
 
@@ -150,7 +151,7 @@ int mainx(int argc, char **argv) {
 	err |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
 		SDL_GL_CONTEXT_PROFILE_CORE);
 
-	log("attr err: %d", err);
+	logln("attr err: %d", err);
 
 	win = SDL_CreateWindow(
 			"rigby",
@@ -163,10 +164,10 @@ int mainx(int argc, char **argv) {
 	SDL_GLContext context = SDL_GL_CreateContext(win);
 
 	if(ogl_LoadFunctions() == ogl_LOAD_FAILED) {
-		log("*** couldn't load GL");
+		logln("*** couldn't load GL");
 	}
 
-	log("GL funcs loaded");
+	logln("GL funcs loaded");
 
 	//vsync
 	SDL_GL_SetSwapInterval(1);
@@ -183,7 +184,7 @@ int mainx(int argc, char **argv) {
 	font = TTF_OpenFont("fonts/Consolas.ttf", 18);
 
 	if (font == 0) {
-		log("** font not loaded");
+		logln("** font not loaded");
 	}
 
 	lua_State *lua = luaL_newstate();
@@ -194,20 +195,20 @@ int mainx(int argc, char **argv) {
 	lua_call(lua, 0, 0);
 
 	const char *game_dll = config_str(lua, "game_dll");
-	log("game_dll: [%s]", game_dll);
+	logln("game_dll: [%s]", game_dll);
 
 	MonoAssembly *game_assembly = 
 		mono_domain_assembly_open(domain, game_dll);
 
 	string first_level = string(config_str(lua, "first_level"));
-	log("first_level: [%s]", first_level.c_str());
+	logln("first_level: [%s]", first_level.c_str());
 
 	int last = first_level.rfind(".");
 	string ns = first_level.substr(0, last);
-	log("namespace: [%s]", ns.c_str());
+	logln("namespace: [%s]", ns.c_str());
 
 	string name = first_level.substr(last + 1);
-	log("name: [%s]", name.c_str());
+	logln("name: [%s]", name.c_str());
 
 	/* we usually get the class we need during initialization */
 	MonoImage *image = mono_assembly_get_image(game_assembly);
