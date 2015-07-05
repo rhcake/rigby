@@ -20,45 +20,54 @@ API_GEN = API_H.map { |f|
 File.open(SWIG_I, "w") { |f|
 	f.puts("%module #{SWIG_MOD}");
 	f.puts("");
+	def GetNSA(inc)
+		dir = File.dirname(inc);
+		dir = dir.sub(/^inc\/api\//, "");
+		nsa = dir.split("/");
+		nsa.shift();
+		return nsa;
+	end
 	f.puts("%{");
 	API_H.each { |h|
+		nsa = GetNSA(h);
+		nsa.each { |n|
+			f.puts("namespace #{n} {");
+		};
 		f.puts("#include <#{h.sub(/^inc\//, "")}>");
+		nsa.each { |n|
+			f.puts("}");
+		};
 	};
 	f.puts("%}");
 	f.puts("");
-	f.puts("%include <#{SWIG_WIN}>");
+	f.puts("%include \"#{SWIG_WIN}\"");
 	f.puts("");
 	API_H.each { |h|
-		ns = h.sub(/^inc\/api\//, "");
-		ns = File.dirname(ns);
-		ns = ns.split("/");
-		ns.shift();
-		if (ns.length() > 0) then
+		nsa = GetNSA(h);
+		if (nsa.length() > 0) then
 			f.print("%nspace ");
-			ns.each { |n|
+			nsa.each { |n|
 				f.print("#{n}::");
 			};
 			f.puts("#{File.basename(h, File.extname(h))};");
-			ns.each { |n|
-				f.puts("namespace #{n} {");
-			};
 		end
+		nsa.each { |n|
+			f.puts("namespace #{n} {");
+		};
 		f.puts("%include \"#{h}\"");
-		if (ns.length() > 0) then
-			ns.each { |n|
-				f.puts("}");
-			};
-		end
-		f.puts("");
+		nsa.each { |n|
+			f.puts("}");
+		};
 	};
 }
 
 
+SWIG_WRAP = "gen/src/RigbyBridge_wrap.cpp";
 SWIG_FLAGS = [
 	"-c++",
 	"-csharp",
 	"-namespace Rigby",
-	"-o gen/src/RigbyBridge_wrap.cpp",
+	"-o #{SWIG_WRAP}",
 	"-outdir gen/api/Rigby",
 	"-dllimport __Internal"].join(" ");
 
@@ -68,8 +77,18 @@ rule /^gen\/api\/.+\.cs$/ => [ ->(f) {
 }, ->(f) {
 	f.ext("cpp").sub(/^gen\/api\//, "src/api/");
 }, "gen/api/Rigby", "gen/src"] do |f|
-	puts("#{f.source} --> #{f.name}");
+
+	#Generate
 	sh "swig #{SWIG_FLAGS} #{SWIG_I}";
+
+	#Compile Generated c/cpp
+	gen = FileList["gen/src/**/*.cpp", "gen/src/**/*.c"];
+	obj = gen.map do |f| 
+		f.ext("obj").sub(/^gen\/src\//, "out/gen/");
+	end
+	obj.each{ |o|
+		Rake::Task[o].invoke();
+	};
 end
 
 
@@ -89,8 +108,79 @@ file API_DLL => API_CS + API_GEN + ["bin"] do
 end
 
 
-task :default => API_DLL;
+GEN = FileList["gen/src/**/*.cpp", "gen/src/**/*.c"].map do |f|
+	f.sub(/^gen\/src\//, "src/gen/");
+end
+SRC = FileList["src/**/*.cpp", "src/**/*.c"] + GEN;
+OBJ = SRC.map do |f| 
+	f.ext("obj").sub(/^src\//, "out/");
+end
+
+
+EXE = "bin/rigby.exe";
+directory "out";
+
+
+CFLAGS = [
+	"/c",
+	"/I inc",
+	"/I libs/lua-5.3_Win32_dll12_lib/include",
+	"/I libs/SDL2-2.0.3/include",
+	"/I \"C:/Program Files (x86)/Mono/include/mono-2.0\"",
+	"/I libs/assimp/include",
+	"/I libs/glm",
+	"/D _RIGBY_DEBUG_",
+	"/MD",
+	"/EHsc"].join(" ");
+
+
+rule ".obj" => ->(f) {
+	f.ext("cpp").sub(/^out\//, "src/");
+} do |f|
+	FileUtils::mkdir_p(File.dirname(f.name));
+	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
+end
+
+
+#For generated source
+rule ".obj" => ->(f) {
+	f.ext("cpp").sub(/^out\/gen\//, "gen/src/");
+} do |f|
+	FileUtils::mkdir_p(File.dirname(f.name));
+	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
+end
+
+
+rule ".obj" => ->(f) {
+	f.ext("c").sub(/^out\//, "src/");
+} do |f|
+	FileUtils::mkdir_p(File.dirname(f.name));
+	sh "cl #{CFLAGS} #{f.source} -Fo#{f.name}"
+end
+
+
+LUA_LIB = "libs/lua-5.3_Win32_dll12_lib";
+SDL_LIB = "libs/SDL2-2.0.3/lib/x86";
+
+
+LDFLAGS = [
+	"#{LUA_LIB}/lua53.lib",
+	"#{SDL_LIB}/SDL2.lib",
+	"#{SDL_LIB}/SDL2main.lib",
+	"#{SDL_LIB}/SDL2_ttf.lib",
+	"libs/assimp/lib32/assimp.lib",
+	"opengl32.lib",
+	"\"C:/Program Files (x86)/Mono/lib/mono-2.0.lib\""].join(" ");
+
+
+file EXE => ["out"] + OBJ do
+	sh "link /SUBSYSTEM:CONSOLE #{LDFLAGS} #{OBJ.join(" ")} /OUT:#{EXE}"
+end
+
+
+task :default => [API_DLL, EXE];
 
 
 CLEAN.include("bin");
 CLEAN.include("gen");
+CLEAN.include("out");

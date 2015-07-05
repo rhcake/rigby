@@ -1,7 +1,7 @@
 #pragma once
 
 #include <assimp/Importer.hpp>
-#include <api/RawAsset.h>
+#include <api/Rigby/RawAsset.h>
 
 class AssetLoader {
 public:
