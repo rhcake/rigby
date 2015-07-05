@@ -184,3 +184,4 @@ task :default => [API_DLL, EXE];
 CLEAN.include("bin");
 CLEAN.include("gen");
 CLEAN.include("out");
+CLEAN.include(SWIG_I);

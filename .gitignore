@@ -4,3 +4,5 @@ bin/
 out/
 gen/
 
+#swig
+RigbyBridge.i
